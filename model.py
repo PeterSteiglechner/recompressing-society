@@ -19,9 +19,6 @@ import matplotlib.pyplot as plt
 import inspect
 import pandas as pd
 import seaborn as sns
-import matplotlib.ticker as ticker
-from itertools import combinations, combinations_with_replacement
-
 #%%
 def play_one_round(seed, D, P, N, b, c, costFunc, C0, C1):
     assert(int(N/2) == N/2)
