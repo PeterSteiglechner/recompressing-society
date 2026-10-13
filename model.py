@@ -6,10 +6,11 @@
 #   - The individuals solve P problems, where N/2 individuals should do action 0, the other N/2 action 1
 #   - Making an error reduces utility by c. Doing the correct action increases utility by b 
 #   - Individuals store D identities. Storing reduces utility.
-#   - We assume that individuals solve the first D problems perfectly and store the corresponding action as an identity
-#   - The remaining P-D problems are solved as follows:
+#   - Individuals then solve the problems one by one:
 #       - The individuals agree on one identity dimension to sort themselves in action 0/action 1 individuals.
-#       - They choose the identity that minimises the collective error     
+#       - For the  first D problems this is exaclty the corresponding identity (these problems contribute with utility b per person)
+#       - For the Dth to Pth problem, they need to find some identity dimension that 
+#       - We assume that they choose the identity that minimises the collective error     
 #    - We track the average utilty dependent on the number of identities individuals store.
 
 
@@ -23,43 +24,49 @@ import seaborn as sns
 def play_one_round(seed, D, P, N, b, c, costFunc, C0, C1):
     assert(int(N/2) == N/2)
     np.random.seed(seed)
-    # first D solutions
-    identities = np.array([np.random.choice([0] * int(N/2) + [1] * int(N/2), size=N, replace=False) for d in range(D)])
-    # true solutions for P-D problems
-    problemsolutions = np.array([np.random.choice([0] * int(N/2) + [1] * int(N/2), size=N, replace=False) for p in range(D, P)])
+
+    # true solutions for D solutions
+    solutions = np.array([np.random.choice([0] * int(N/2) + [1] * int(N/2), size=N, replace=False) for p in range(P)])
+    
+    identities = solutions[:D,:]
+
     # best identity for each of the P-D problem (the one that minimises error rate)
-    best_ids = [np.argmin(np.abs(identities - problemsolutions[p]).sum(axis=1)) for p in range(P-D)]
+    best_ids = [np.argmin(np.abs(identities - solutions[p,:]).sum(axis=1)) for p in range(P)]
+    
     # utilities of the N agents for P-D problems (benefits for correct + costs for incorrect)
     utilities_problems = np.array([
         (
-            (problemsolutions[p] == identities[best_ids[p]]) * b - 
-            (problemsolutions[p] != identities[best_ids[p]]) * c         )
-        for p in range(P-D)
+            (solutions[p] == identities[best_ids[p]]) * b - 
+            (solutions[p] != identities[best_ids[p]]) * c         )
+        for p in range(P)
     ])
+
     # add utility benefit for D correct solutions (b * D for a single agent)
     # add utility cost for holding D identities (C(D) for a single agent)
-    utilities = utilities_problems.sum(axis=0) + b * D  -  costFunc(D, C0=C0, C1=C1)
+    utilities = utilities_problems.sum(axis=0) -  costFunc(D, C0=C0, C1=C1)
     return utilities
 
 def sim(n_runs, D, P, N, b, c, costFunc, C0, C1):
     utilities = []
     for s in range(n_runs):
         utilities.append(play_one_round(s, D, P, N, b, c, costFunc, C0, C1))
-    return utilities
+    return np.array(utilities)
 
 
 def get_Dstar(df, params):
-    res_Dstar = []
+    """return the optimal D to fix"""
+    results_Dstar = []
     other_params = [p for p in ["N","P","C(D)", "C0", "C1", "b", "c"] if p not in params]
     param_combis = df[params].value_counts().index.to_list()
     for param1, param2 in param_combis:
         curr_df = df.query(f"{params[0]}=={param1} and {params[1]}=={param2}")
+        # get max utility
         maxU = curr_df["u_mean"].max()
+        # get D for which we get max utility
         Dstar = curr_df.loc[curr_df["u_mean"]==maxU, "D"].values[0]
         other_params_values = [curr_df[c].unique()[0] for c in other_params]
-
-        res_Dstar.append([param1, param2]+other_params_values+[Dstar, maxU])
-    df_Dstar = pd.DataFrame(res_Dstar, columns=params+other_params+["Dstar", "maxU"] )
+        results_Dstar.append([param1, param2]+other_params_values+[Dstar, maxU])
+    df_Dstar = pd.DataFrame(results_Dstar, columns=params+other_params+["Dstar", "maxU"] )
     return df_Dstar
 
 
@@ -91,7 +98,7 @@ def plot_heat(df, df_Dstar, params, ):
     fig, ax = plt.subplots(1,1, figsize=(14/2.54, 12/2.54))
     other_params = [p for p in ["N","P","C(D)", "C0", "C1", "b", "c"] if p not in params]
     other_params_values = [df[c].unique()[0] for c in other_params]
-    sns.heatmap(df_Dstar.pivot_table(index=params[1], columns=params[0], values="Dstar"), vmin=1, vmax=P, cmap="hot", cbar=True, ax=ax, cbar_kws=dict(label=r"optimal nr of identities $D^*$"))
+    sns.heatmap(df_Dstar.pivot_table(index=params[1], columns=params[0], values="Dstar"), vmin=1, vmax=df["D"].max(), cmap="hot", cbar=True, ax=ax, cbar_kws=dict(label=r"optimal nr of identities $D^*$"))
     ax.set_xticklabels([f"{float(t.get_text()):.1f}" for t in ax.get_xticklabels()])
     ax.set_yticklabels([f"{float(t.get_text()):.1f}" for t in ax.get_yticklabels()], rotation=0)
     ax.set_ylim(ax.get_ylim()[1], ax.get_ylim()[0])
@@ -116,13 +123,13 @@ C_name = inspect.getsource(costFunc).split(":")[1].split("\n")[0]
 
 grid = np.arange(0,2.01,step=0.1)
 bc_combis = [(b,c) for b in grid for c in grid]
-n_runs = 1
+n_runs = 10
 res = []
 for b,c in bc_combis:
     if c==grid[0]: print(b)
-    for D in np.arange(1,P+1):
+    for D in np.arange(1,P+1,2):
         u = sim(n_runs, D, P, N, b, c, costFunc, C0, C1)
-        res.append([N, P, D, c, b, C0, C1, C_name, np.mean(u), np.std(u)])
+        res.append([N, P, D, c, b, C0, C1, C_name, np.mean(u, axis=(0,1)), np.std(np.mean(u, axis=0))])
 
 df_linear = pd.DataFrame(res, columns=["N", "P", "D", "c", "b", "C0", "C1", "C(D)", "u_mean","u_std"])
 df_Dstar_linear = get_Dstar(df_linear, ["b","c"])
@@ -159,7 +166,7 @@ for costFunc, C1 in zip([costFunc_exp, costFunc_log], [0.035, 1]):
     for b, C0 in bC0_combis:
         if C0==C0_grid[0]: print(b)
         C_name = inspect.getsource(costFunc).split(":")[1].split("\n")[0]
-        for D in np.arange(1,P):
+        for D in np.arange(1,P,2):
             u = sim(n_runs, D, P, N, b, c, costFunc, C0, C1)
             res.append([N, P, D, c, b, C0, C1, C_name, np.mean(u), np.std(u)])
 
