@@ -200,20 +200,25 @@ C0, C1 = 1, np.nan
 costFunc = lambda D, C0, C1: C0 * D
 C_name = "C0 * D"
 
-grid = np.round(np.arange(0, 2.01, 0.1), 10)   # rounding keeps float comparisons safe
+grid_b  = np.round(np.arange(0, 2.01, 0.1), 3)
+grid_C0 = np.round(np.arange(0.5, 2, 0.1), 3)
+
+# grid = np.round(np.arange(0, 2.01, 0.1), 10)   # rounding keeps float comparisons safe
 Ds = np.arange(1, P + 1)                       # includes D = P
-df_linear = run_grid(grid, grid, Ds, P, N, n_runs=1000,
-                        costFunc=costFunc, C0=C0, C1=C1, C_name=C_name)
-df_Dstar_linear = get_Dstar(df_linear, ["b", "c"])
+df_linear = run_grid_C0(grid_b, c, grid_C0, Ds, P, N, n_runs=1000,
+                        costFunc=costFunc,  C1=C1, C_name=C_name)
+df_Dstar_linear = get_Dstar(df_linear, ["b", "C0"])
 
 #%%
 os.makedirs("figs", exist_ok=True)
 c = 1.0
-plot_UoverD(df_linear, df_Dstar_linear, [dict(b=b, c=c) for b in grid], inset_loc=(0.6,0.1,0.36,0.38))
-plt.tight_layout()
-plt.savefig(f"figs/example_linear_UoverDCurves_c{c}.png", dpi=300)
+C0plot = grid_C0[5]
 
-plot_heat(df_linear, df_Dstar_linear, ["b", "c"])
+plot_UoverD(df_linear, df_Dstar_linear, [dict(b=b, C0=C0plot) for b in grid_b], inset_loc=(0.6,0.1,0.36,0.38))
+plt.tight_layout()
+plt.savefig(f"figs/example_linear_UoverDCurves_C0-{C0plot}.png", dpi=300)
+
+plot_heat(df_linear, df_Dstar_linear, ["b", "C0"])
 plt.tight_layout()
 plt.savefig("figs/linear_Dstar_overStoreCost_X_Benefit.png", dpi=300)
 
@@ -231,7 +236,7 @@ costFunc_log = lambda D, C0, C1=1: C0 * np.log2(C1 * D)
 for cfunc in["exp", "log"]:
     C1 = 0.035 if cfunc == "exp" else 1
     grid_b  = np.round(np.arange(0, 10.01, 1), 3)
-    grid_C0 = np.round(np.arange(1, 50, 5), 3)
+    grid_C0 = np.round(np.arange(1, 51, 5), 3)
     Ds = np.arange(1, P + 1)
     df_explog = run_grid_C0(grid_b, c, grid_C0, Ds, P, N, n_runs=1000,
                         costFunc=costFunc_exp if cfunc=="exp" else costFunc_log, C1=C1, C_name=f"C0*{cfunc}(C1*D)")
@@ -240,7 +245,7 @@ for cfunc in["exp", "log"]:
     C0plot = grid_C0[5]
     plot_UoverD(df_explog, df_Dstar_explog, [dict(b=b, C0=C0plot) for b in grid_b], inset_loc=((0.6 if cfunc=="exp" else 0.4),0.1,0.36,0.38))
     plt.tight_layout()
-    plt.savefig(f"figs/example_{cfunc}_UoverDCurves_C0{C0}.png", dpi=300)
+    plt.savefig(f"figs/example_{cfunc}_UoverDCurves_C0-{C0plot}.png", dpi=300)
 
     fig, ax = plot_heat(df_explog, df_Dstar_explog, ["b", "C0"])
     plt.tight_layout()
