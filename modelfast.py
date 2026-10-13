@@ -230,7 +230,7 @@ plt.savefig("figs/linear_Dstar_overStoreCost_X_Benefit.png", dpi=300)
 # ------------------------------------
 P = 50
 N = 100
-c=0.5
+c=1
 costFunc_exp = lambda D, C0, C1=0.035: C0 * np.exp(C1 * D)
 costFunc_log = lambda D, C0, C1=1: C0 * np.log2(C1 * D)
 for cfunc in["exp", "log"]:
