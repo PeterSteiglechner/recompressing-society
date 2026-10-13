@@ -197,6 +197,7 @@ check()
 
 P, N = 50, 100
 C0, C1 = 1, np.nan
+c = 1.0
 costFunc = lambda D, C0, C1: C0 * D
 C_name = "C0 * D"
 
